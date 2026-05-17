@@ -77,7 +77,7 @@ public partial class CoreConfigV2rayService
                         {
                             vnextItem = outbound.settings.vnext.First();
                         }
-                        vnextItem.address = _node.Address;
+                        vnextItem.address = _node.GetServerAddress();
                         vnextItem.port = _node.Port;
 
                         UsersItem4Ray usersItem;
@@ -120,7 +120,7 @@ public partial class CoreConfigV2rayService
                         {
                             serversItem = outbound.settings.servers.First();
                         }
-                        serversItem.address = _node.Address;
+                        serversItem.address = _node.GetServerAddress();
                         serversItem.port = _node.Port;
                         serversItem.password = _node.Password;
                         serversItem.method = AppManager.Instance.GetShadowsocksSecurities(_node).Contains(protocolExtra.SsMethod)
@@ -148,7 +148,7 @@ public partial class CoreConfigV2rayService
                         {
                             serversItem = outbound.settings.servers.First();
                         }
-                        serversItem.address = _node.Address;
+                        serversItem.address = _node.GetServerAddress();
                         serversItem.port = _node.Port;
                         serversItem.method = null;
                         serversItem.password = null;
@@ -183,7 +183,7 @@ public partial class CoreConfigV2rayService
                         {
                             vnextItem = outbound.settings.vnext.First();
                         }
-                        vnextItem.address = _node.Address;
+                        vnextItem.address = _node.GetServerAddress();
                         vnextItem.port = _node.Port;
 
                         UsersItem4Ray usersItem;
@@ -224,7 +224,7 @@ public partial class CoreConfigV2rayService
                         {
                             serversItem = outbound.settings.servers.First();
                         }
-                        serversItem.address = _node.Address;
+                        serversItem.address = _node.GetServerAddress();
                         serversItem.port = _node.Port;
                         serversItem.password = _node.Password;
 
@@ -241,7 +241,7 @@ public partial class CoreConfigV2rayService
                         outbound.settings = new()
                         {
                             version = 2,
-                            address = _node.Address,
+                            address = _node.GetServerAddress(),
                             port = _node.Port,
                         };
                         outbound.settings.vnext = null;
@@ -250,7 +250,7 @@ public partial class CoreConfigV2rayService
                     }
                 case EConfigType.WireGuard:
                     {
-                        var address = _node.Address;
+                        var address = _node.GetServerAddress();
                         if (Utils.IsIpv6(address))
                         {
                             address = $"[{address}]";
@@ -332,6 +332,8 @@ public partial class CoreConfigV2rayService
             var kcpMtu = 0;
             var headerType = string.Empty;
             var xhttpExtra = string.Empty;
+            var sni = _node.Sni.TrimEx();
+            var useragent = _config.CoreBasicItem.DefUserAgent ?? string.Empty;
             switch (network)
             {
                 case nameof(ETransport.raw):
@@ -349,6 +351,13 @@ public partial class CoreConfigV2rayService
                 case nameof(ETransport.ws):
                     host = transport.Host?.TrimEx() ?? string.Empty;
                     path = transport.Path?.TrimEx() ?? string.Empty;
+                    if (path.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (sni.IsNullOrEmpty() && host.IsNotEmpty())
+                        {
+                            sni = host;
+                        }
+                    }
                     break;
 
                 case nameof(ETransport.httpupgrade):
@@ -369,9 +378,6 @@ public partial class CoreConfigV2rayService
                     headerType = transport.GrpcMode?.TrimEx() ?? string.Empty;
                     break;
             }
-
-            var sni = _node.Sni.TrimEx();
-            var useragent = _config.CoreBasicItem.DefUserAgent ?? string.Empty;
 
             //if tls
             if (_node.StreamSecurity == Global.StreamSecurity)
@@ -491,15 +497,44 @@ public partial class CoreConfigV2rayService
                 //ws
                 case nameof(ETransport.ws):
                     WsSettings4Ray wsSettings = new();
+                    var spoofedDomain = host;
 
-                    if (host.IsNotEmpty())
+                    if (path.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
                     {
-                        wsSettings.host = host;
+                        try
+                        {
+                            var wssUrl = new Uri(path);
+                            wsSettings.path = wssUrl.AbsolutePath;
+
+                            if (spoofedDomain.IsNotEmpty())
+                            {
+                                wsSettings.headers ??= new Headers4Ray();
+                                wsSettings.headers.Host = spoofedDomain;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.SaveLog(_tag, ex);
+                            wsSettings.path = path;
+                            if (spoofedDomain.IsNotEmpty())
+                            {
+                                wsSettings.headers ??= new Headers4Ray();
+                                wsSettings.headers.Host = spoofedDomain;
+                            }
+                        }
                     }
-                    if (path.IsNotEmpty())
+                    else
                     {
-                        wsSettings.path = path;
+                        if (host.IsNotEmpty())
+                        {
+                            wsSettings.host = host;
+                        }
+                        if (path.IsNotEmpty())
+                        {
+                            wsSettings.path = path;
+                        }
                     }
+
                     if (useragent.IsNotEmpty())
                     {
                         wsSettings.headers ??= new Headers4Ray();

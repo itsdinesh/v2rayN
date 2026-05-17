@@ -86,7 +86,7 @@ public partial class CoreConfigSingboxService
             var protocolExtra = _node.GetProtocolExtra();
             var transportExtra = _node.GetTransportExtra();
             var network = _node.GetNetwork();
-            outbound.server = _node.Address;
+            outbound.server = _node.GetServerAddress();
             outbound.server_port = _node.Port;
             outbound.type = Global.ProtocolTypes[_node.ConfigType];
 
@@ -321,7 +321,7 @@ public partial class CoreConfigSingboxService
                             public_key = protocolExtra.WgPublicKey ?? string.Empty,
                             pre_shared_key = protocolExtra.WgPresharedKey,
                             reserved = Utils.String2List(protocolExtra.WgReserved)?.Select(s => s.Trim()).Select(int.Parse).ToList(),
-                            address = _node.Address,
+                            address = _node.GetServerAddress(),
                             port = _node.Port,
                             allowed_ips = ["0.0.0.0/0", "::/0"],
                         };
@@ -469,6 +469,19 @@ public partial class CoreConfigSingboxService
                 case nameof(ETransport.ws):
                     transport.type = nameof(ETransport.ws);
                     var wsPath = transportExtra.Path;
+
+                    if (wsPath.IsNotEmpty() && wsPath.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            var wssUrl = new Uri(wsPath);
+                            wsPath = wssUrl.AbsolutePath;
+                        }
+                        catch (Exception ex)
+                        {
+                            Logging.SaveLog(_tag, ex);
+                        }
+                    }
 
                     // Parse eh and ed parameters from path using regex
                     if (!wsPath.IsNullOrEmpty())

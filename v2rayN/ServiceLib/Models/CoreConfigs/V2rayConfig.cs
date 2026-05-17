@@ -426,6 +426,9 @@ public class Headers4Ray
 {
     [JsonPropertyName("User-Agent")]
     public string UserAgent { get; set; }
+
+    [JsonPropertyName("Host")]
+    public string Host { get; set; }
 }
 
 public class HttpupgradeSettings4Ray

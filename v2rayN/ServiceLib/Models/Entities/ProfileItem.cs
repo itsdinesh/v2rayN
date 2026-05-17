@@ -146,6 +146,27 @@ public class ProfileItem
         TransportExtra = JsonUtils.Serialize(transportExtra, false);
     }
 
+    public string GetServerAddress()
+    {
+        try
+        {
+            var network = GetNetwork();
+            var transport = GetTransportExtra();
+            var path = transport.Path?.TrimEx() ?? string.Empty;
+
+            if (network == nameof(ETransport.ws) && path.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
+            {
+                var wssUrl = new Uri(path);
+                return wssUrl.IdnHost;
+            }
+        }
+        catch (Exception)
+        {
+            // Ignore parsing failures and fallback
+        }
+        return Address;
+    }
+
     #endregion function
 
     [PrimaryKey]

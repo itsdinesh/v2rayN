@@ -91,7 +91,7 @@ public class SpeedtestService(Config config, Func<SpeedTestResult, Task> updateF
             lstSelected.Add(new ServerTestItem()
             {
                 IndexId = it.IndexId,
-                Address = it.Address,
+                Address = profile.GetServerAddress(),
                 Port = it.Port,
                 ConfigType = it.ConfigType,
                 QueueNum = i,
